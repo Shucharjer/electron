@@ -48,7 +48,7 @@ static void present(ImGui_ImplVulkanH_Window* imgui_vk_wnd);
 
 class app::impl {
 public:
-    bool init(const app_config& config) {
+    bool init(const wnd_config& config) {
         if (!SDL_Init(SDL_INIT_VIDEO)) {
             println("Error: SDL_Init(): {}", SDL_GetError());
             return false;
@@ -129,30 +129,29 @@ public:
         while (SDL_PollEvent(&event)) {
             ImGui_ImplSDL3_ProcessEvent(&event);
             if (event.type == SDL_EVENT_QUIT) [[unlikely]] {
-                running_ = false;
+                stopped_ = true;
             }
             if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
                 event.window.windowID == SDL_GetWindowID(sdl_window_)) {
-                running_ = false;
+                stopped_ = true;
             }
         }
     }
 
-    NODISCARD bool is_running() const noexcept { return running_; }
+    NODISCARD bool is_stopped() const noexcept { return stopped_; }
 
-    void run() {
+    // NOLINTNEXTLINE
+    void render_begin() {
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
+    }
 
-        // render stage
-
+    void render_end() {
         ImGui::Render();
         ImDrawData* draw_data = ImGui::GetDrawData();
         render(&imgui_window_data_, draw_data);
-
-        // present
-        present(&imgui_window_data_);
+        ::present(&imgui_window_data_);
     }
 
     void destroy() {
@@ -167,18 +166,22 @@ public:
     }
 
 private:
-    bool running_           = true;
+    bool stopped_           = false;
     SDL_Window* sdl_window_ = nullptr;
     ImGui_ImplVulkanH_Window imgui_window_data_;
 };
 
 app::impl* app::_create_impl() { return new app::impl; }
 
-bool app::_init_impl(app::impl* impl, const app_config& config) { return impl->init(config); }
+bool app::_init_impl(app::impl* impl, const wnd_config& config) { return impl->init(config); }
 
-bool app::_is_running(app::impl* impl) { return impl->is_running(); }
+bool app::_is_stopped(app::impl* impl) { return impl->is_stopped(); }
 
-void app::_run_impl(impl* impl) { impl->run(); }
+void app::_poll_events(app::impl* impl) { impl->poll_events(); }
+
+void app::_render_begin(app::impl* impl) { impl->render_begin(); }
+
+void app::_render_end(app::impl* impl) { impl->render_end(); }
 
 void app::_destroy_impl(app::impl* impl) {
     impl->destroy();
