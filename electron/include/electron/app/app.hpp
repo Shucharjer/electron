@@ -1,5 +1,7 @@
 #pragma once
+#include <proton/world.hpp>
 #include "electron/app/config.hpp"
+#include "proton/stage.hpp"
 
 namespace electron {
 
@@ -20,24 +22,31 @@ public:
 
     template <auto... Worlds>
     void run(auto&& tup) {
+        using namespace proton;
+        using enum stage;
         auto& [config]    = tup;
         auto* const pimpl = _create_impl();
 
-        // auto worlds = make_worlds<Worlds...>();
         if (!_init_impl(pimpl, config)) {
             return;
         }
+
+        auto worlds = make_worlds<Worlds...>();
+        call_startup(worlds);
+
         while (true) {
             _poll_events(pimpl);
             if (_is_stopped(pimpl)) [[unlikely]] {
                 break;
             }
+            call_update(worlds);
 
             _render_begin(pimpl);
-            // render
+            call<render>(worlds);
             _render_end(pimpl);
         }
 
+        call<shutdown>(worlds);
         _destroy_impl(pimpl);
     }
 };
