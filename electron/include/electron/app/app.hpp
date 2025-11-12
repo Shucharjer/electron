@@ -2,6 +2,7 @@
 #include <proton/world.hpp>
 #include "electron/app/config.hpp"
 #include "proton/stage.hpp"
+#include "proton/registry.hpp"
 
 namespace electron {
 
