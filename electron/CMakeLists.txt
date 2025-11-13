@@ -71,8 +71,6 @@ else()
   set(CPPFRONT_INCLUDE_DIR ${EXTERNAL_DIR}/src/cppfront/include)
 endif()
 
-set(GENERATED_SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
-
 include(translate)
 
 # cpp2
