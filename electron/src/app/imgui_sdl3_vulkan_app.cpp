@@ -40,10 +40,12 @@ inline static bool g_swapchain_rebuild           = false;
 
 static bool setup_vulkan(std::vector<const char*> instance_extensions);
 static bool setup_vulkan_window(
-    ImGui_ImplVulkanH_Window* imgui_vk_wnd, VkSurfaceKHR surface, int width, int height);
+    ImGui_ImplVulkanH_Window* imgui_vk_wnd, VkSurfaceKHR surface, int width,
+    int height);
 static void cleanup_vulkan_window(ImGui_ImplVulkanH_Window* imgui_vk_wnd);
 static void cleanup_vulkan();
-static void render(ImGui_ImplVulkanH_Window* imgui_vk_wnd, ImDrawData* draw_data);
+static void
+    render(ImGui_ImplVulkanH_Window* imgui_vk_wnd, ImDrawData* draw_data);
 static void present(ImGui_ImplVulkanH_Window* imgui_vk_wnd);
 
 class app::impl {
@@ -60,8 +62,8 @@ public:
         window_flags |= (config.flags & resizable) ? SDL_WINDOW_RESIZABLE : 0;
         window_flags |= (config.flags & borderless) ? SDL_WINDOW_BORDERLESS : 0;
         window_flags |= (config.flags & maximized) ? SDL_WINDOW_MAXIMIZED : 0;
-        sdl_window_ =
-            SDL_CreateWindow(config.name.c_str(), config.width, config.height, window_flags);
+        sdl_window_ = SDL_CreateWindow(
+            config.name.c_str(), config.width, config.height, window_flags);
         if (sdl_window_ == nullptr) {
             println("Error: SDL_CreateWindow(): {}", SDL_GetError());
             return false;
@@ -70,8 +72,9 @@ public:
         auto scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
 
         std::vector<const char*> extensions;
-        uint32_t sdl_extension_count      = 0;
-        const char* const* sdl_extensions = SDL_Vulkan_GetInstanceExtensions(&sdl_extension_count);
+        uint32_t sdl_extension_count = 0;
+        const char* const* sdl_extensions =
+            SDL_Vulkan_GetInstanceExtensions(&sdl_extension_count);
         for (uint32_t i = 0; i < sdl_extension_count; ++i) {
             extensions.emplace_back(sdl_extensions[i]); // NOLINT
         }
@@ -79,13 +82,15 @@ public:
 
         VkSurfaceKHR surface{};
         VkResult result{};
-        if (!SDL_Vulkan_CreateSurface(sdl_window_, g_instance, g_allocator, &surface)) {
+        if (!SDL_Vulkan_CreateSurface(
+                sdl_window_, g_instance, g_allocator, &surface)) {
             println("Error: SDL_Vulkan_CreateSurface(): {}", SDL_GetError());
             return false;
         }
 
         ImGui_ImplVulkanH_Window* imgui_vulkan_window = &imgui_window_data_;
-        setup_vulkan_window(imgui_vulkan_window, surface, config.width, config.height);
+        setup_vulkan_window(
+            imgui_vulkan_window, surface, config.width, config.height);
         SDL_ShowWindow(sdl_window_);
 
         IMGUI_CHECKVERSION();
@@ -173,7 +178,9 @@ private:
 
 app::impl* app::_create_impl() { return new app::impl; }
 
-bool app::_init_impl(app::impl* impl, const wnd_config& config) { return impl->init(config); }
+bool app::_init_impl(app::impl* impl, const wnd_config& config) {
+    return impl->init(config);
+}
 
 bool app::_is_stopped(app::impl* impl) { return impl->is_stopped(); }
 
@@ -189,11 +196,11 @@ void app::_destroy_impl(app::impl* impl) {
 }
 
     // NOLINTNEXTLINE
-    #define CHECK_VK_RESULT(result, msg)                                                           \
-        if ((result) != VK_SUCCESS) {                                                              \
-            println(msg);                                                                          \
-            return false;                                                                          \
-        }                                                                                          \
+    #define CHECK_VK_RESULT(result, msg)                                       \
+        if ((result) != VK_SUCCESS) {                                          \
+            println(msg);                                                      \
+            return false;                                                      \
+        }                                                                      \
         //
 
 bool setup_vulkan(std::vector<const char*> instance_extensions) {
@@ -205,22 +212,29 @@ bool setup_vulkan(std::vector<const char*> instance_extensions) {
         create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 
         uint32_t properties_count{};
-        vkEnumerateInstanceExtensionProperties(nullptr, &properties_count, nullptr);
+        vkEnumerateInstanceExtensionProperties(
+            nullptr, &properties_count, nullptr);
         std::vector<VkExtensionProperties> properties(properties_count);
-        result =
-            vkEnumerateInstanceExtensionProperties(nullptr, &properties_count, properties.data());
-        CHECK_VK_RESULT(result, "[vulkan] Failed at enumerate instance extension properties")
+        result = vkEnumerateInstanceExtensionProperties(
+            nullptr, &properties_count, properties.data());
+        CHECK_VK_RESULT(
+            result,
+            "[vulkan] Failed at enumerate instance extension properties")
 
         auto check = [](const std::vector<VkExtensionProperties>& properties,
                         const char* extension) {
             for (const auto& property : properties) {
-                if (std::strcmp(static_cast<const char*>(property.extensionName), extension) == 0) {
+                if (std::strcmp(
+                        static_cast<const char*>(property.extensionName),
+                        extension) == 0) {
                     return true;
                 }
             }
             return false;
         };
-        if (check(properties, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)) {
+        if (check(
+                properties,
+                VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)) {
             instance_extensions.emplace_back(
                 VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
         }
@@ -236,7 +250,8 @@ bool setup_vulkan(std::vector<const char*> instance_extensions) {
     IM_ASSERT(g_physical_device != VK_NULL_HANDLE);
 
     // select graphics queue family
-    g_queue_family = ImGui_ImplVulkanH_SelectQueueFamilyIndex(g_physical_device);
+    g_queue_family =
+        ImGui_ImplVulkanH_SelectQueueFamilyIndex(g_physical_device);
     IM_ASSERT(g_queue_family != static_cast<uint32_t>(-1));
 
     // create logical deivec
@@ -251,23 +266,28 @@ bool setup_vulkan(std::vector<const char*> instance_extensions) {
         vkEnumerateDeviceExtensionProperties(
             g_physical_device, nullptr, &properties_count, properties.Data);
     #ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
-        if (IsExtensionAvailable(properties, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME))
-            device_extensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+        if (IsExtensionAvailable(
+                properties, VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME))
+            device_extensions.push_back(
+                VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
     #endif
 
         auto queue_priority = make_array<float>(1.0F);
-        auto queue_info     = make_array<VkDeviceQueueCreateInfo>(VkDeviceQueueCreateInfo{});
+        auto queue_info =
+            make_array<VkDeviceQueueCreateInfo>(VkDeviceQueueCreateInfo{});
         queue_info[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queue_info[0].queueFamilyIndex      = g_queue_family;
-        queue_info[0].queueCount            = 1;
-        queue_info[0].pQueuePriorities      = queue_priority.data();
-        VkDeviceCreateInfo create_info      = {};
-        create_info.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        create_info.queueCreateInfoCount    = sizeof(queue_info) / sizeof(queue_info[0]);
+        queue_info[0].queueFamilyIndex = g_queue_family;
+        queue_info[0].queueCount       = 1;
+        queue_info[0].pQueuePriorities = queue_priority.data();
+        VkDeviceCreateInfo create_info = {};
+        create_info.sType              = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+        create_info.queueCreateInfoCount =
+            sizeof(queue_info) / sizeof(queue_info[0]);
         create_info.pQueueCreateInfos       = queue_info.data();
         create_info.enabledExtensionCount   = (uint32_t)device_extensions.Size;
         create_info.ppEnabledExtensionNames = device_extensions.Data;
-        result = vkCreateDevice(g_physical_device, &create_info, g_allocator, &g_device);
+        result                              = vkCreateDevice(
+            g_physical_device, &create_info, g_allocator, &g_device);
         CHECK_VK_RESULT(result, "[vulkan] failed at creating device");
         vkGetDeviceQueue(g_device, g_queue_family, 0, &g_queue);
     }
@@ -276,8 +296,9 @@ bool setup_vulkan(std::vector<const char*> instance_extensions) {
     {
         using psize_t   = VkDescriptorPoolSize;
         auto pool_sizes = std::array{
-            psize_t{ .type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                    .descriptorCount = IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE }
+            psize_t{ .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    .descriptorCount =
+                         IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE }
         };
         VkDescriptorPoolCreateInfo create_info;
         create_info.sType   = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -288,7 +309,8 @@ bool setup_vulkan(std::vector<const char*> instance_extensions) {
         }
         create_info.poolSizeCount = pool_sizes.size();
         create_info.pPoolSizes    = pool_sizes.data();
-        result = vkCreateDescriptorPool(g_device, &create_info, g_allocator, &g_descriptor_pool);
+        result                    = vkCreateDescriptorPool(
+            g_device, &create_info, g_allocator, &g_descriptor_pool);
         CHECK_VK_RESULT(result, "[vulkan] Failed at create descriptor pool");
     }
 
@@ -298,40 +320,45 @@ bool setup_vulkan(std::vector<const char*> instance_extensions) {
     #undef CHECK_VK_RESULT
 
 bool setup_vulkan_window(
-    ImGui_ImplVulkanH_Window* imgui_vk_wnd, VkSurfaceKHR surface, int width, int height) {
+    ImGui_ImplVulkanH_Window* imgui_vk_wnd, VkSurfaceKHR surface, int width,
+    int height) {
     imgui_vk_wnd->Surface = surface;
 
     VkBool32 result{};
-    vkGetPhysicalDeviceSurfaceSupportKHR(g_physical_device, g_queue_family, surface, &result);
+    vkGetPhysicalDeviceSurfaceSupportKHR(
+        g_physical_device, g_queue_family, surface, &result);
     if (result != VK_TRUE) {
         println("Error: No WSI support on physical device");
         return false;
     }
 
-    constexpr std::array<VkFormat, 4> surface_formats = { VK_FORMAT_B8G8R8A8_UNORM,
-                                                          VK_FORMAT_B8G8R8A8_UNORM,
-                                                          VK_FORMAT_B8G8R8A8_UNORM,
-                                                          VK_FORMAT_B8G8R8A8_UNORM };
-    const VkColorSpaceKHR surface_color_space         = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-    imgui_vk_wnd->SurfaceFormat                       = ImGui_ImplVulkanH_SelectSurfaceFormat(
-        g_physical_device, surface, surface_formats.data(), surface_formats.size(),
-        surface_color_space);
+    constexpr std::array<VkFormat, 4> surface_formats = {
+        VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM,
+        VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_UNORM
+    };
+    const VkColorSpaceKHR surface_color_space =
+        VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+    imgui_vk_wnd->SurfaceFormat = ImGui_ImplVulkanH_SelectSurfaceFormat(
+        g_physical_device, surface, surface_formats.data(),
+        surface_formats.size(), surface_color_space);
 
     auto present_modes = make_array<VkPresentModeKHR>(
-        VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_FIFO_KHR);
+        VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR,
+        VK_PRESENT_MODE_FIFO_KHR);
     imgui_vk_wnd->PresentMode = ImGui_ImplVulkanH_SelectPresentMode(
         g_physical_device, surface, present_modes.data(), present_modes.size());
 
     // create swap chain
     IM_ASSERT(g_min_image_count);
     ImGui_ImplVulkanH_CreateOrResizeWindow(
-        g_instance, g_physical_device, g_device, imgui_vk_wnd, g_queue_family, g_allocator, width,
-        height, g_min_image_count);
+        g_instance, g_physical_device, g_device, imgui_vk_wnd, g_queue_family,
+        g_allocator, width, height, g_min_image_count);
 
     return true;
 }
 void cleanup_vulkan_window(ImGui_ImplVulkanH_Window* imgui_vk_wnd) {
-    ImGui_ImplVulkanH_DestroyWindow(g_instance, g_device, imgui_vk_wnd, g_allocator);
+    ImGui_ImplVulkanH_DestroyWindow(
+        g_instance, g_device, imgui_vk_wnd, g_allocator);
 }
 void cleanup_vulkan() {
     vkDestroyDescriptorPool(g_device, g_descriptor_pool, g_allocator);
@@ -351,13 +378,15 @@ void check_vk_result(VkResult result) {
 
 void render(ImGui_ImplVulkanH_Window* imgui_vk_wnd, ImDrawData* draw_data) {
     VkSemaphore image_acquired_semaphore =
-        imgui_vk_wnd->FrameSemaphores[imgui_vk_wnd->SemaphoreIndex].ImageAcquiredSemaphore;
+        imgui_vk_wnd->FrameSemaphores[imgui_vk_wnd->SemaphoreIndex]
+            .ImageAcquiredSemaphore;
     VkSemaphore render_complete_semaphore =
-        imgui_vk_wnd->FrameSemaphores[imgui_vk_wnd->SemaphoreIndex].RenderCompleteSemaphore;
+        imgui_vk_wnd->FrameSemaphores[imgui_vk_wnd->SemaphoreIndex]
+            .RenderCompleteSemaphore;
 
     VkResult result = vkAcquireNextImageKHR(
-        g_device, imgui_vk_wnd->Swapchain, UINT64_MAX, image_acquired_semaphore, VK_NULL_HANDLE,
-        &imgui_vk_wnd->FrameIndex);
+        g_device, imgui_vk_wnd->Swapchain, UINT64_MAX, image_acquired_semaphore,
+        VK_NULL_HANDLE, &imgui_vk_wnd->FrameIndex);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         g_swapchain_rebuild = true;
     }
@@ -368,7 +397,8 @@ void render(ImGui_ImplVulkanH_Window* imgui_vk_wnd, ImDrawData* draw_data) {
         check_vk_result(result);
     }
 
-    ImGui_ImplVulkanH_Frame* frame = &imgui_vk_wnd->Frames[imgui_vk_wnd->FrameIndex];
+    ImGui_ImplVulkanH_Frame* frame =
+        &imgui_vk_wnd->Frames[imgui_vk_wnd->FrameIndex];
     {
         result = vkWaitForFences(
             g_device, 1, &frame->Fence, VK_TRUE,
@@ -382,21 +412,22 @@ void render(ImGui_ImplVulkanH_Window* imgui_vk_wnd, ImDrawData* draw_data) {
         result = vkResetCommandPool(g_device, frame->CommandPool, 0);
         check_vk_result(result);
         VkCommandBufferBeginInfo info = {};
-        info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         result = vkBeginCommandBuffer(frame->CommandBuffer, &info);
         check_vk_result(result);
     }
     {
-        VkRenderPassBeginInfo info    = {};
-        info.sType                    = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        info.renderPass               = imgui_vk_wnd->RenderPass;
-        info.framebuffer              = frame->Framebuffer;
-        info.renderArea.extent.width  = imgui_vk_wnd->Width;
+        VkRenderPassBeginInfo info   = {};
+        info.sType                   = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        info.renderPass              = imgui_vk_wnd->RenderPass;
+        info.framebuffer             = frame->Framebuffer;
+        info.renderArea.extent.width = imgui_vk_wnd->Width;
         info.renderArea.extent.height = imgui_vk_wnd->Height;
         info.clearValueCount          = 1;
         info.pClearValues             = &imgui_vk_wnd->ClearValue;
-        vkCmdBeginRenderPass(frame->CommandBuffer, &info, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBeginRenderPass(
+            frame->CommandBuffer, &info, VK_SUBPASS_CONTENTS_INLINE);
     }
 
     // Record dear imgui primitives into command buffer
@@ -405,16 +436,17 @@ void render(ImGui_ImplVulkanH_Window* imgui_vk_wnd, ImDrawData* draw_data) {
     // Submit command buffer
     vkCmdEndRenderPass(frame->CommandBuffer);
     {
-        VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        VkSubmitInfo info               = {};
-        info.sType                      = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        info.waitSemaphoreCount         = 1;
-        info.pWaitSemaphores            = &image_acquired_semaphore;
-        info.pWaitDstStageMask          = &wait_stage;
-        info.commandBufferCount         = 1;
-        info.pCommandBuffers            = &frame->CommandBuffer;
-        info.signalSemaphoreCount       = 1;
-        info.pSignalSemaphores          = &render_complete_semaphore;
+        VkPipelineStageFlags wait_stage =
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        VkSubmitInfo info         = {};
+        info.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        info.waitSemaphoreCount   = 1;
+        info.pWaitSemaphores      = &image_acquired_semaphore;
+        info.pWaitDstStageMask    = &wait_stage;
+        info.commandBufferCount   = 1;
+        info.pCommandBuffers      = &frame->CommandBuffer;
+        info.signalSemaphoreCount = 1;
+        info.pSignalSemaphores    = &render_complete_semaphore;
 
         result = vkEndCommandBuffer(frame->CommandBuffer);
         check_vk_result(result);
@@ -429,7 +461,8 @@ void present(ImGui_ImplVulkanH_Window* imgui_vk_wnd) {
     }
 
     VkSemaphore render_complete_semaphore =
-        imgui_vk_wnd->FrameSemaphores[imgui_vk_wnd->SemaphoreIndex].RenderCompleteSemaphore;
+        imgui_vk_wnd->FrameSemaphores[imgui_vk_wnd->SemaphoreIndex]
+            .RenderCompleteSemaphore;
     VkPresentInfoKHR info{};
     info.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     info.waitSemaphoreCount = 1;

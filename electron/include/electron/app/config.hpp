@@ -12,8 +12,10 @@ enum class window_flags : uint8_t {
     maximized  = 1U << 3U
 };
 
-constexpr window_flags operator|(const window_flags& lhs, const window_flags& rhs) noexcept {
-    return static_cast<window_flags>(static_cast<uint8_t>(lhs) | static_cast<uint8_t>(rhs));
+constexpr window_flags
+    operator|(const window_flags& lhs, const window_flags& rhs) noexcept {
+    return static_cast<window_flags>(
+        static_cast<uint8_t>(lhs) | static_cast<uint8_t>(rhs));
 }
 
 constexpr bool operator&(window_flags lhs, window_flags rhs) noexcept {

@@ -1,8 +1,8 @@
 #pragma once
 #include <proton/world.hpp>
 #include "electron/app/config.hpp"
-#include "proton/stage.hpp"
 #include "proton/registry.hpp"
+#include "proton/stage.hpp"
 
 namespace electron {
 
