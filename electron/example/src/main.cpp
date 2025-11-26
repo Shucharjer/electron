@@ -1,8 +1,9 @@
+#include <proton/proton.hpp>
+#include <proton/run.hpp>
+#include <proton/system.hpp>
+#include <proton/world.hpp>
 #include "electron/app/app.hpp"
 #include "electron/app/config.hpp"
-#include "proton/system.hpp"
-#include "proton/world.hpp"
-#include "proton/world_desc.hpp"
 
 using namespace proton;
 using namespace electron;
