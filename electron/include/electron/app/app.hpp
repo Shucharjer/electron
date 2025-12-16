@@ -1,8 +1,11 @@
 #pragma once
+#include <exec/static_thread_pool.hpp>
+#include <neutron/execution.hpp>
+#include <proton/command_buffer.hpp>
+#include <proton/registry.hpp>
+#include <proton/stage.hpp>
 #include <proton/world.hpp>
 #include "electron/app/config.hpp"
-#include "proton/registry.hpp"
-#include "proton/stage.hpp"
 
 namespace electron {
 
@@ -23,6 +26,7 @@ public:
 
     template <auto... Worlds>
     void run(auto&& tup) {
+        using namespace neutron::execution;
         using namespace proton;
         using enum stage;
         auto& [config]    = tup;
@@ -32,22 +36,29 @@ public:
             return;
         }
 
+        auto thread_pool   = exec::static_thread_pool{};
+        scheduler auto sch = thread_pool.get_scheduler();
+
+        const auto concurrency = thread_pool.available_parallelism();
+        std::vector<command_buffer<>> cmdbufs{ concurrency };
+
         auto worlds = make_worlds<Worlds...>();
-        call_startup(worlds);
+
+        call_startup(sch, cmdbufs, worlds);
 
         while (true) {
             _poll_events(pimpl);
             if (_is_stopped(pimpl)) [[unlikely]] {
                 break;
             }
-            call_update(worlds);
+            call_update(sch, cmdbufs, worlds);
 
             _render_begin(pimpl);
-            call<render>(worlds);
+            call<render>(sch, cmdbufs, worlds);
             _render_end(pimpl);
         }
 
-        call<shutdown>(worlds);
+        call<shutdown>(sch, cmdbufs, worlds);
         _destroy_impl(pimpl);
     }
 };
