@@ -20,8 +20,16 @@ target_link_libraries(electron PUBLIC proton)
 
 find_package(imgui CONFIG REQUIRED)
 find_package(SDL3 CONFIG REQUIRED)
-find_package(Vulkan REQUIRED)
-target_link_libraries(electron PUBLIC imgui::imgui SDL3::SDL3 Vulkan::Vulkan)
+find_package(VulkanHeaders CONFIG REQUIRED)
+find_package(VulkanMemoryAllocator CONFIG REQUIRED)
+find_package(unofficial-vulkan-memory-allocator-hpp CONFIG REQUIRED)
+target_link_libraries(electron PUBLIC
+  imgui::imgui
+  SDL3::SDL3
+  Vulkan::Headers
+  GPUOpen::VulkanMemoryAllocator
+  unofficial::VulkanMemoryAllocator-Hpp::VulkanMemoryAllocator-Hpp
+)
 
 target_include_directories(electron PUBLIC ${ELECTRON_SOURCE_DIR}/third_party/include)
 file(GLOB_RECURSE ELECTRON_THIRD_PARTY_SOURCE_FILES ${ELECTRON_SOURCE_DIR}/third_party/src/*.cpp)
