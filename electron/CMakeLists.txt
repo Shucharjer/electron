@@ -10,6 +10,7 @@ list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_CURRENT_SOURCE_DIR}/../cmake/modules)
 option(ELECTRON_BUILD_EXAMPLE OFF)
 option(ELECTRON_BUILD_TEST OFF)
 option(ELECTRON_USES_LOCAL_CPPFRONT OFF)
+option(ELECTRON_USES_SDL3 OFF)
 
 set(ELECTRON_SOURCE_DIR ${electron_SOURCE_DIR})
 
@@ -19,20 +20,36 @@ target_include_directories(electron PUBLIC ${ELECTRON_SOURCE_DIR}/include)
 target_link_libraries(electron PUBLIC proton)
 
 find_package(imgui CONFIG REQUIRED)
-find_package(SDL3 CONFIG REQUIRED)
+find_package(Vulkan REQUIRED)
 find_package(VulkanHeaders CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(unofficial-vulkan-memory-allocator-hpp CONFIG REQUIRED)
 target_link_libraries(electron PUBLIC
   imgui::imgui
-  SDL3::SDL3
+  Vulkan::Vulkan # for sdl & imgui impl
   Vulkan::Headers
   GPUOpen::VulkanMemoryAllocator
   unofficial::VulkanMemoryAllocator-Hpp::VulkanMemoryAllocator-Hpp
 )
 
-target_include_directories(electron PUBLIC ${ELECTRON_SOURCE_DIR}/third_party/include)
-file(GLOB_RECURSE ELECTRON_THIRD_PARTY_SOURCE_FILES ${ELECTRON_SOURCE_DIR}/third_party/src/*.cpp)
+if (ELECTRON_USES_SDL3)
+  target_compile_definitions(electron PUBLIC ELECTRON_USES_SDL3_VULKAN)
+  find_package(SDL3 CONFIG REQUIRED)
+  target_link_libraries(electron PUBLIC SDL3::SDL3)
+  target_include_directories(electron PUBLIC ${ELECTRON_SOURCE_DIR}/third_party/imgui/sdl3/include)
+  file(GLOB_RECURSE ELECTRON_THIRD_PARTY_SOURCE_FILES ${ELECTRON_SOURCE_DIR}/third_party/imgui/sdl3/src/*.cpp)
+  target_sources(electron PRIVATE ${ELECTRON_THIRD_PARTY_SOURCE_FILES})
+else()
+  target_compile_definitions(electron PUBLIC ELECTRON_USES_SDL2_VULKAN)
+  find_package(SDL2 CONFIG REQUIRED)
+  target_link_libraries(electron PUBLIC SDL2::SDL2)
+  target_include_directories(electron PUBLIC ${ELECTRON_SOURCE_DIR}/third_party/imgui/sdl2/include)
+  file(GLOB_RECURSE ELECTRON_THIRD_PARTY_SOURCE_FILES ${ELECTRON_SOURCE_DIR}/third_party/imgui/sdl2/src/*.cpp)
+  target_sources(electron PRIVATE ${ELECTRON_THIRD_PARTY_SOURCE_FILES})
+endif()
+
+target_include_directories(electron PUBLIC ${ELECTRON_SOURCE_DIR}/third_party/imgui/api/vulkan/include)
+file(GLOB_RECURSE ELECTRON_THIRD_PARTY_SOURCE_FILES ${ELECTRON_SOURCE_DIR}/third_party/imgui/api/vulkan/src/*.cpp)
 target_sources(electron PRIVATE ${ELECTRON_THIRD_PARTY_SOURCE_FILES})
 
 if(ELECTRON_USES_LOCAL_CPPFRONT)
