@@ -17,7 +17,7 @@ int main() {
                                        .width  = 1280,
                                        .height = 960,
                                        .flags  = window_flags::none };
-    app::create() | run_worlds<world>(config);
+    App::create() | run_worlds<world>(config);
 
     return 0;
 }
