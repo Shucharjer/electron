@@ -43,19 +43,23 @@ CheckOptions:
   - key:    readability-identifier-naming.ConceptIgnoredRegexp
     value:  '^_[a-z0-9][a-z0-9_]+$'
   - key:    readability-identifier-naming.ConstantCase
-    value:  lower_case
+    value:  camelCase
   - key:    readability-identifier-naming.ConstantIgnoredRegexp
     value:  '^_[a-z0-9][a-z0-9_]+'
   - key:    readability-identifier-naming.EnumCase
-    value:  lower_case
+    value:  camelCase
   - key:    readability-identifier-naming.EnumIgnoredRegexp
     value:  '^_[a-z0-9][a-z0-9_]+$'
+  - key:    readability-identifier-naming.EnumConstantCase
+    value:  camelCase
+  - key:    readability-identifier-naming.EnumConstantPrefix
+    value:  'e'
   - key:    readability-identifier-naming.FunctionCase
-    value:  lower_case
+    value:  camelCase
   - key:    readability-identifier-naming.FunctionIgnoredRegexp
     value:  '^_[a-z0-9][a-z0-9_]+$'
   - key:    readability-identifier-naming.LocalConstantCase
-    value:  lower_case
+    value:  camelCase
   - key:    readability-identifier-naming.LocalVariableIgnoredRegexp
     value:  '_[a-zA-Z0-9_]*'
   - key:    readability-identifier-naming.MacroDefinitionCase
@@ -67,23 +71,23 @@ CheckOptions:
   - key:    readability-identifier-naming.MemberIgnoredRegexp
     value:  '_[a-zA-Z0-9_]*'
   - key:    readability-identifier-naming.MethodCase
-    value:  lower_case
+    value:  camelCase
   - key:    readability-identifier-naming.NamespaceCase
     value:  lower_case
   - key:    readability-identifier-naming.NamespaceIgnoredRegexp
     value:  '_[a-zA-Z0-9_]*'
   - key:    readability-identifier-naming.ParameterCase
-    value:  lower_case
+    value:  camelCase
   - key:    readability-identifier-naming.ParameterIgnoredRegexp
     value:  '_'
   - key:    readability-identifier-naming.ParameterPackCase
-    value:  lower_case
+    value:  camelCase
   - key:    readability-identifier-naming.PrivateMemberSuffix
     value:  '_'
   - key:    readability-identifier-naming.PrivateMethodPrefix
     value:  '_'
   - key:    readability-identifier-naming.ScopedEnumConstantCase
-    value:  lower_case
+    value:  camelCase
   - key:    readability-identifier-naming.StructCase
     value:  CamelCase
   - key:    readability-identifier-naming.StructIgnoredRegexp
@@ -97,9 +101,9 @@ CheckOptions:
   - key:    readability-identifier-naming.TypedefCase
     value:  lower_case
   - key:    readability-identifier-naming.UnionCase
-    value:  lower_case
+    value:  CamelCase
   - key:    readability-identifier-naming.UnionIgnoredRegexp
     value:  '^_[a-z0-9][a-z0-9_]+$'
   - key:    readability-identifier-naming.VariableCase
-    value:  lower_case
+    value:  camelCase
 
