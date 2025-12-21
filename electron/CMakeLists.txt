@@ -7,8 +7,8 @@ project(
 
 list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_CURRENT_SOURCE_DIR}/../cmake/modules)
 
-option(ELECTRON_BUILD_EXAMPLE OFF)
-option(ELECTRON_BUILD_TEST OFF)
+option(BUILD_ELECTRON_EXAMPLE OFF)
+option(BUILD_ELECTRON_TESTING OFF)
 option(ELECTRON_USES_LOCAL_CPPFRONT OFF)
 option(ELECTRON_USES_SDL3 OFF)
 
@@ -102,7 +102,7 @@ include(translate)
 translate_include_directories(${CPPFRONT_EXECUTABLE} ${CPPFRONT_INCLUDE_DIR} electron PUBLIC ${ELECTRON_SOURCE_DIR}/include)
 target_translate_sources(${CPPFRONT_EXECUTABLE} electron PUBLIC ${ELECTRON_SOURCE_DIR}/src)
 
-if(ELECTRON_BUILD_EXAMPLE)
+if(BUILD_ELECTRON_EXAMPLE)
   file(GLOB_RECURSE ELECTRON_EXAMPLE_SOURCE_FILES ${ELECTRON_SOURCE_DIR}/example/src/*.cpp)
   add_executable(example ${ELECTRON_EXAMPLE_SOURCE_FILES})
   target_link_libraries(example PRIVATE electron)
@@ -111,7 +111,7 @@ if(ELECTRON_BUILD_EXAMPLE)
   target_translate_sources(${CPPFRONT_EXECUTABLE} example PRIVATE ${ELECTRON_SOURCE_DIR}/example/src)
 endif()
 
-if(ELECTRON_BUILD_TEST)
+if(BUILD_ELECTRON_TESTING)
   include(CTest)
   enable_testing()
   include(exec)
