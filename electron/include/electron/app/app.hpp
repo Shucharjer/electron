@@ -12,22 +12,22 @@
 namespace electron {
 
 class App {
-    class impl;
-    static impl* _create_impl();
-    static bool _init_impl(impl*, const wnd_config&);
-    static void _poll_events(impl*);
-    static bool _is_stopped(impl*);
-    static void _render_begin(impl*);
-    static void _render_end(impl*);
-    static void _destroy_impl(impl*);
+    class Impl;
+    static Impl* _create_impl();
+    static VulkanContext* _init_impl(Impl*, const wnd_config&);
+    static void _poll_events(Impl*);
+    static bool _is_stopped(Impl*);
+    static void _render_begin(Impl*);
+    static void _render_end(Impl*);
+    static void _destroy_impl(Impl*);
 
 public:
     using config_type = std::tuple<wnd_config>;
 
-    static App create() { return {}; }
+    static App Create() { return {}; }
 
     template <auto OriginalWorld>
-    static consteval auto mixin() noexcept {
+    static consteval auto Mixin() noexcept {
         using namespace proton;
         using namespace systems;
         using enum stage;
@@ -47,7 +47,8 @@ public:
         auto& [config]    = tup;
         auto* const pimpl = _create_impl();
 
-        if (!_init_impl(pimpl, config)) {
+        auto* pVkContext = _init_impl(pimpl, config);
+        if (pVkContext == nullptr) {
             return;
         }
 
@@ -57,10 +58,11 @@ public:
         const auto concurrency = thread_pool.available_parallelism();
         std::vector<command_buffer<>> cmdbufs(concurrency);
 
-        constexpr auto descriptor = mixin<World>();
+        constexpr auto descriptor = Mixin<World>();
         proton::world auto world  = make_world<descriptor>();
 
         auto [vkContext] = res<VulkanContext&>(world);
+        vkContext        = *pVkContext;
 
         call_startup(sch, cmdbufs, world);
 
