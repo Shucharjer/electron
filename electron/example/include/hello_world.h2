@@ -1,0 +1,7 @@
+#include <imgui.h>
+
+renderHello: () -> void = {
+    ImGui::Begin("window");
+    ImGui::Text("hello world");
+    ImGui::End();
+}
