@@ -10,7 +10,11 @@ list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_CURRENT_SOURCE_DIR}/../cmake/modules)
 option(BUILD_ELECTRON_EXAMPLE OFF)
 option(BUILD_ELECTRON_TESTING OFF)
 option(ELECTRON_USES_LOCAL_CPPFRONT OFF)
-option(ELECTRON_USES_SDL3 OFF)
+if(WIN32)
+  set(ELECTRON_USES_SDL3 ON CACHE BOOL "")
+else()
+  set(ELECTRON_USES_SDL3 OFF CACHE BOOL "")
+endif()
 
 set(ELECTRON_SOURCE_DIR ${electron_SOURCE_DIR})
 
@@ -105,6 +109,7 @@ target_translate_sources(${CPPFRONT_EXECUTABLE} electron PUBLIC ${ELECTRON_SOURC
 if(BUILD_ELECTRON_EXAMPLE)
   file(GLOB_RECURSE ELECTRON_EXAMPLE_SOURCE_FILES ${ELECTRON_SOURCE_DIR}/example/src/*.cpp)
   add_executable(example ${ELECTRON_EXAMPLE_SOURCE_FILES})
+  target_include_directories(example PRIVATE ${ELECTRON_SOURCE_DIR}/example/include)
   target_link_libraries(example PRIVATE electron)
   # cpp2
   target_translate_include_directories(${CPPFRONT_EXECUTABLE} example PRIVATE ${ELECTRON_SOURCE_DIR}/example/include)
