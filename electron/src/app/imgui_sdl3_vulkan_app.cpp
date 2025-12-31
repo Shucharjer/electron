@@ -13,8 +13,8 @@
     #include <imgui_impl_sdl3.h>
     #include <imgui_impl_vulkan.h>
     #include <vulkan/vulkan_core.h>
-    #include <neutron/neutron.hpp>
     #include <neutron/print.hpp>
+    #include <neutron/utility.hpp>
     #include <vulkan/vulkan.hpp>
     #include "electron/app/app.hpp"
     #include "electron/app/config.hpp"
@@ -138,7 +138,7 @@ public:
         }
     }
 
-    NODISCARD bool is_stopped() const noexcept { return stopped_; }
+    ATOM_NODISCARD bool is_stopped() const noexcept { return stopped_; }
 
     // NOLINTNEXTLINE
     void renderBegin() {
