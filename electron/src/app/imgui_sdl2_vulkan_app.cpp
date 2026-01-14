@@ -28,7 +28,7 @@ static bool SetupVulkan(
     std::vector<const char*>& instanceExtensions);
 static bool SetupVulkanWindow(
     ImGui_ImplVulkanH_Window* imguiVkWnd, VulkanContext&, VkSurfaceKHR surface,
-    int width, int height);
+    int width, int height, uint8_t framebufferCount);
 static void
     CleanupVulkanWindows(ImGui_ImplVulkanH_Window* imguiVkWnd, VulkanContext&);
 static void CleanupVulkan(VulkanContext&);
@@ -53,10 +53,10 @@ public:
         sdlwnd_flags |= (config.flags & maximized) ? SDL_WINDOW_MAXIMIZED : 0;
         auto window_flags = static_cast<SDL_WindowFlags>(sdlwnd_flags);
 
-        sdl_window_ = SDL_CreateWindow(
+        sdlWindow_ = SDL_CreateWindow(
             config.name.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
             config.width, config.height, window_flags);
-        if (sdl_window_ == nullptr) {
+        if (sdlWindow_ == nullptr) {
             println("Error: SDL_CreateWindow(): {}", SDL_GetError());
             return nullptr;
         }
@@ -64,26 +64,26 @@ public:
         std::vector<const char*> extensions;
         uint32_t sdl_extension_count = 0;
         SDL_Vulkan_GetInstanceExtensions(
-            sdl_window_, &sdl_extension_count, nullptr);
+            sdlWindow_, &sdl_extension_count, nullptr);
         extensions.resize(sdl_extension_count);
         SDL_Vulkan_GetInstanceExtensions(
-            sdl_window_, &sdl_extension_count, extensions.data());
+            sdlWindow_, &sdl_extension_count, extensions.data());
 
         SetupVulkan(vkContext_, config.name, extensions);
 
         VkSurfaceKHR surface{};
         VkResult result{};
         if (SDL_Vulkan_CreateSurface(
-                sdl_window_, vkContext_.instance, &surface) == 0) {
+                sdlWindow_, vkContext_.instance, &surface) == 0) {
             println("Error: SDL_Vulkan_CreateSurface(): {}", SDL_GetError());
             return nullptr;
         }
 
-        ImGui_ImplVulkanH_Window* imgui_vulkan_window = &imgui_window_data_;
+        ImGui_ImplVulkanH_Window* imgui_vulkan_window = &imguiWindowData_;
         SetupVulkanWindow(
             imgui_vulkan_window, vkContext_, surface, config.width,
-            config.height);
-        SDL_ShowWindow(sdl_window_);
+            config.height,framebufferCount_);
+        SDL_ShowWindow(sdlWindow_);
 
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -99,7 +99,7 @@ public:
         ImGuiStyle& style = ImGui::GetStyle();
         // dpi
 
-        ImGui_ImplSDL2_InitForVulkan(sdl_window_);
+        ImGui_ImplSDL2_InitForVulkan(sdlWindow_);
         ImGui_ImplVulkan_InitInfo init_info{};
         init_info.Instance       = vkContext_.instance;
         init_info.PhysicalDevice = vkContext_.physicalDevice;
@@ -123,7 +123,7 @@ public:
         return &vkContext_;
     }
 
-    void pollEvents() {
+    bool pollEvents() {
         SDL_Event event;
         while (SDL_PollEvent(&event) != 0) {
             ImGui_ImplSDL2_ProcessEvent(&event);
@@ -132,10 +132,30 @@ public:
             }
             if (event.type == SDL_WINDOWEVENT &&
                 event.window.event == SDL_WINDOWEVENT_CLOSE &&
-                event.window.windowID == SDL_GetWindowID(sdl_window_)) {
+                event.window.windowID == SDL_GetWindowID(sdlWindow_)) {
                 stopped_ = true;
             }
         }
+
+        if ((SDL_GetWindowFlags(sdlWindow_) & SDL_WINDOW_MINIMIZED) != 0) {
+            return false;
+        }
+
+        int width{};
+        int height{};
+        SDL_GetWindowSize(sdlWindow_, &width, &height);
+        if (width > 0 && height > 0 && (vkContext_.rebuildSwapchain)) {
+            ImGui_ImplVulkan_SetMinImageCount(framebufferCount_);
+            ImGui_ImplVulkanH_CreateOrResizeWindow(
+                vkContext_.instance, vkContext_.physicalDevice,
+                vkContext_.device, &imguiWindowData_,
+                vkContext_.queueFamilyIndex, vkContext_.allocator, width,
+                height, framebufferCount_);
+            imguiWindowData_.FrameIndex = 0;
+            vkContext_.rebuildSwapchain = false;
+        }
+
+        return true;
     }
 
     ATOM_NODISCARD bool is_stopped() const noexcept { return stopped_; }
@@ -154,7 +174,7 @@ public:
             (draw_data->DisplaySize.x <= 0.0F ||
              draw_data->DisplaySize.y <= 0.0F);
         if (!minimized) {
-            Render(&imgui_window_data_, vkContext_, draw_data);
+            Render(&imguiWindowData_, vkContext_, draw_data);
         }
         auto& io = ImGui::GetIO();
         if ((io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) != 0) {
@@ -162,7 +182,7 @@ public:
             ImGui::RenderPlatformWindowsDefault();
         }
         if (!minimized) {
-            ::Present(&imgui_window_data_, vkContext_);
+            ::Present(&imguiWindowData_, vkContext_);
         }
     }
 
@@ -171,16 +191,17 @@ public:
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplSDL2_Shutdown();
         ImGui::DestroyContext();
-        CleanupVulkanWindows(&imgui_window_data_, vkContext_);
+        CleanupVulkanWindows(&imguiWindowData_, vkContext_);
         CleanupVulkan(vkContext_);
-        SDL_DestroyWindow(sdl_window_);
+        SDL_DestroyWindow(sdlWindow_);
         SDL_Quit();
     }
 
 private:
+    uint8_t framebufferCount_;
     bool stopped_           = false;
-    SDL_Window* sdl_window_ = nullptr;
-    ImGui_ImplVulkanH_Window imgui_window_data_;
+    SDL_Window* sdlWindow_ = nullptr;
+    ImGui_ImplVulkanH_Window imguiWindowData_;
     VulkanContext vkContext_;
 };
 
@@ -192,7 +213,7 @@ VulkanContext* App::_init_impl(App::Impl* impl, const wnd_config& config) {
 
 bool App::_is_stopped(App::Impl* impl) { return impl->is_stopped(); }
 
-void App::_poll_events(App::Impl* impl) { impl->pollEvents(); }
+bool App::_poll_events(App::Impl* impl) { return impl->pollEvents(); }
 
 void App::_render_begin(App::Impl* impl) { impl->renderBegin(); }
 
@@ -285,7 +306,7 @@ bool SetupVulkan(
 
 bool SetupVulkanWindow(
     ImGui_ImplVulkanH_Window* imguiVkWnd, VulkanContext& vkContext,
-    VkSurfaceKHR surface, int width, int height) {
+    VkSurfaceKHR surface, int width, int height, uint8_t framebufferCount) {
     imguiVkWnd->Surface = surface;
 
     VkBool32 result{};
@@ -314,10 +335,11 @@ bool SetupVulkanWindow(
         present_modes.size());
 
     // create swap chain
-    IM_ASSERT(2);
+    IM_ASSERT(framebufferCount >= 2);
     ImGui_ImplVulkanH_CreateOrResizeWindow(
         vkContext.instance, vkContext.physicalDevice, vkContext.device,
-        imguiVkWnd, vkContext.queueFamilyIndex, {}, width, height, 2);
+        imguiVkWnd, vkContext.queueFamilyIndex, {}, width, height,
+        framebufferCount);
 
     return true;
 }

@@ -1,13 +1,13 @@
 #pragma once
 #include <vulkan/vulkan_core.h>
-#include <proton/proton.hpp>
+#include <neutron/ecs.hpp>
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_handles.hpp>
 
 namespace electron {
 
 struct VulkanContext {
-    using resource_concept = proton::resource_t;
+    using resource_concept = neutron::resource_t;
 
     vk::Instance instance;
     vk::PhysicalDevice physicalDevice;

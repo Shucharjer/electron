@@ -21,7 +21,7 @@ set(ELECTRON_SOURCE_DIR ${electron_SOURCE_DIR})
 file(GLOB_RECURSE ELECTRON_SOURCE_FILES ${ELECTRON_SOURCE_DIR}/src/*.cpp)
 add_library(electron STATIC ${ELECTRON_SOURCE_FILES})
 target_include_directories(electron PUBLIC ${ELECTRON_SOURCE_DIR}/include)
-target_link_libraries(electron PUBLIC proton)
+target_link_libraries(electron PUBLIC neutron)
 
 find_package(imgui CONFIG REQUIRED)
 find_package(Vulkan REQUIRED)

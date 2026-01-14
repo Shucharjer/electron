@@ -23,6 +23,7 @@ constexpr bool operator&(window_flags lhs, window_flags rhs) noexcept {
 }
 
 struct wnd_config {
+    uint8_t framebufferCount = 2;
     std::string name;
     int width;
     int height;

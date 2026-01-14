@@ -1,14 +1,18 @@
 #include <chrono>
+#include <concepts>
 #include <cstdint>
-#include <proton/args/system/local.hpp>
-#include "neutron/print.hpp"
+#include <neutron/ecs.hpp>
+#include <neutron/print.hpp>
 
 using duration = std::chrono::microseconds;
 using ticks_t  = uint32_t;
 
+constexpr auto b = std::default_initializable<
+    std::chrono::time_point<std::chrono::system_clock>>;
+
 void printFps(
-    proton::local<
-        std::chrono::time_point<std::chrono::steady_clock>, duration, ticks_t>
+    neutron::local<
+        std::chrono::time_point<std::chrono::system_clock>, duration, ticks_t>
         local) {
     using namespace std::chrono;
     auto [tp, dur, ticks] = local;

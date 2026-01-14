@@ -1,10 +1,7 @@
 #pragma once
 #include <exec/static_thread_pool.hpp>
+#include <neutron/ecs.hpp>
 #include <neutron/execution.hpp>
-#include <proton/command_buffer.hpp>
-#include <proton/registry.hpp>
-#include <proton/stage.hpp>
-#include <proton/world.hpp>
 #include "electron/app/config.hpp"
 #include "electron/resources/VulkanContext.hpp"
 #include "electron/systems/render.hpp"
@@ -15,7 +12,7 @@ class App {
     class Impl;
     static Impl* _create_impl();
     static VulkanContext* _init_impl(Impl*, const wnd_config&);
-    static void _poll_events(Impl*);
+    static bool _poll_events(Impl*);
     static bool _is_stopped(Impl*);
     static void _render_begin(Impl*);
     static void _render_end(Impl*);
@@ -28,7 +25,7 @@ public:
 
     template <auto OriginalWorld>
     static consteval auto Mixin() noexcept {
-        using namespace proton;
+        using namespace neutron;
         using namespace systems;
         using enum stage;
 
@@ -41,8 +38,8 @@ public:
 
     template <auto World>
     void run(auto&& tup) {
+        using namespace neutron;
         using namespace neutron::execution;
-        using namespace proton;
         using enum stage;
         auto& [config]    = tup;
         auto* const pimpl = _create_impl();
@@ -59,7 +56,7 @@ public:
         std::vector<command_buffer<>> cmdbufs(concurrency);
 
         constexpr auto descriptor = Mixin<World>();
-        proton::world auto world  = make_world<descriptor>();
+        neutron::world auto world  = make_world<descriptor>();
 
         auto [vkContext] = res<VulkanContext&>(world);
         vkContext        = *pVkContext;
@@ -67,7 +64,9 @@ public:
         call_startup(sch, cmdbufs, world);
 
         while (true) {
-            _poll_events(pimpl);
+            if (!_poll_events(pimpl)) [[unlikely]] {
+                continue;
+            }
             if (_is_stopped(pimpl)) [[unlikely]] {
                 break;
             }
