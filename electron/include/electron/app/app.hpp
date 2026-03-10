@@ -29,9 +29,9 @@ public:
         using namespace systems;
         using enum stage;
 
-        auto renders = add_system<startup, &startup_render> |
-                       add_system<render, &render_system> |
-                       add_system<shutdown, &shutdown_render>;
+        auto renders = add_systems<startup, &startup_render> |
+                       add_systems<render, &render_system> |
+                       add_systems<shutdown, &shutdown_render>;
 
         return OriginalWorld | renders;
     }
