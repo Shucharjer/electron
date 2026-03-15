@@ -8,16 +8,16 @@ namespace _render {
 
 using namespace neutron;
 
-inline void startup_render(res<VulkanContext&> res) {
-    //
+inline void startup_render(global<VulkanContext&> context) {
+    [[maybe_unused]] auto& [vk_context] = context;
 }
 
-inline void render_system(res<VulkanContext&> res) {
-    //
+inline void render_system(global<VulkanContext&> context) {
+    [[maybe_unused]] auto& [vk_context] = context;
 }
 
-inline void shutdown_render(res<VulkanContext&> res) {
-    //
+inline void shutdown_render(global<VulkanContext&> context) {
+    [[maybe_unused]] auto& [vk_context] = context;
 }
 
 } // namespace _render

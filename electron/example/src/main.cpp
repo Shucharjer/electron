@@ -11,8 +11,9 @@ using namespace electron;
 using enum stage;
 
 int main() {
-    constexpr auto world = world_desc | add_system<render, &renderHello> |
-                           add_system<pre_update, &printFps>;
+    constexpr auto world = world_desc | enable_render |
+                           add_systems<render, &renderHello> |
+                           add_systems<pre_update, &printFps>;
     using desc_t      = std::remove_cvref_t<decltype(world)>;
     using resources   = typename descriptor_traits<desc_t>::resources;
     const auto config = wnd_config{ .name   = "example",

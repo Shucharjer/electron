@@ -1,4 +1,7 @@
 #pragma once
+#include <memory>
+#include <type_traits>
+#include <vector>
 #include <exec/static_thread_pool.hpp>
 #include <neutron/ecs.hpp>
 #include <neutron/execution.hpp>
@@ -29,23 +32,34 @@ public:
         using namespace systems;
         using enum stage;
 
-        auto renders = add_systems<startup, &startup_render> |
-                       add_systems<render, &render_system> |
-                       add_systems<shutdown, &shutdown_render>;
+        using descriptor_type = std::remove_cvref_t<decltype(OriginalWorld)>;
 
-        return OriginalWorld | renders;
+        if constexpr (render_info<descriptor_type>::is_enabled) {
+            auto renders = add_systems<startup, &startup_render> |
+                           add_systems<render, &render_system> |
+                           add_systems<shutdown, &shutdown_render>;
+
+            return OriginalWorld | renders;
+        } else {
+            return OriginalWorld;
+        }
     }
 
-    template <auto World>
+    template <auto... Worlds>
     void run(auto&& tup) {
         using namespace neutron;
         using namespace neutron::execution;
-        using enum stage;
-        auto& [config]    = tup;
-        auto* const pimpl = _create_impl();
 
-        auto* pVkContext = _init_impl(pimpl, config);
-        if (pVkContext == nullptr) {
+        if constexpr (sizeof...(Worlds) == 0) {
+            return;
+        }
+
+        auto& [config] = tup;
+        std::unique_ptr<Impl, decltype(&App::_destroy_impl)> pimpl(
+            _create_impl(), &App::_destroy_impl);
+
+        auto* const p_vk_context = _init_impl(pimpl.get(), config);
+        if (p_vk_context == nullptr) {
             return;
         }
 
@@ -54,31 +68,23 @@ public:
 
         const auto concurrency = thread_pool.available_parallelism();
         std::vector<command_buffer<>> cmdbufs(concurrency);
+        auto worlds = make_worlds<Mixin<Worlds>()...>();
+        scoped_global_binding<VulkanContext> vk_context_binding{
+            *p_vk_context
+        };
 
-        constexpr auto descriptor = Mixin<World>();
-        neutron::world auto world  = make_world<descriptor>();
+        struct _app_hooks {
+            Impl* pimpl;
 
-        auto [vkContext] = res<VulkanContext&>(world);
-        vkContext        = *pVkContext;
+            bool poll_events() const { return App::_poll_events(pimpl); }
+            bool is_stopped() const { return App::_is_stopped(pimpl); }
+            void render_begin() const { App::_render_begin(pimpl); }
+            void render_end() const { App::_render_end(pimpl); }
+        };
 
-        call_startup(sch, cmdbufs, world);
-
-        while (true) {
-            if (!_poll_events(pimpl)) [[unlikely]] {
-                continue;
-            }
-            if (_is_stopped(pimpl)) [[unlikely]] {
-                break;
-            }
-            call_update(sch, cmdbufs, world);
-
-            _render_begin(pimpl);
-            call<render>(sch, cmdbufs, world);
-            _render_end(pimpl);
-        }
-
-        call<shutdown>(sch, cmdbufs, world);
-        _destroy_impl(pimpl);
+        auto schedule = make_world_schedule(
+            _app_hooks{ pimpl.get() }, sch, cmdbufs, worlds);
+        schedule.run();
     }
 };
 
