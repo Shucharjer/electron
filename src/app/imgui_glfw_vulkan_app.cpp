@@ -1,21 +1,19 @@
-#ifdef ELECTRON_USES_SDL3_VULKAN
+#if defined(ELECTRON_GLFW_VULKAN_APP)
 
+    #include <array>
     #include <cstdint>
     #include <cstdlib>
     #include <cstring>
+    #include <iostream>
     #include <vector>
-    #include <SDL3/SDL.h>
-    #include <SDL3/SDL_error.h>
-    #include <SDL3/SDL_events.h>
-    #include <SDL3/SDL_video.h>
-    #include <SDL3/SDL_vulkan.h>
     #include <imgui.h>
-    #include <imgui_impl_sdl3.h>
+    #include <imgui_impl_glfw.h>
     #include <imgui_impl_vulkan.h>
     #include <vulkan/vulkan_core.h>
     #include <neutron/print.hpp>
     #include <neutron/utility.hpp>
     #include <vulkan/vulkan.hpp>
+    #include <GLFW/glfw3.h>
     #include "electron/app/app.hpp"
     #include "electron/app/config.hpp"
     #include "electron/resources/VulkanContext.hpp"
@@ -36,87 +34,128 @@ static void ImGuiCheckVkResult(VkResult);
 static void Render(
     ImGui_ImplVulkanH_Window* imguiVkWnd, VulkanContext&, ImDrawData* drawData);
 static void Present(ImGui_ImplVulkanH_Window* imguiVkWnd, VulkanContext&);
+static void GlfwErrorCallback(int error, const char* description);
+static bool IsExtensionAvailable(
+    const std::vector<vk::ExtensionProperties>& properties,
+    const char* extension);
+static bool IsExtensionAvailable(
+    const ImVector<VkExtensionProperties>& properties, const char* extension);
+static bool IsExtensionEnabled(
+    const std::vector<const char*>& enabledExtensions, const char* extension);
 
 class App::Impl {
 public:
     VulkanContext* init(const wnd_config& config) {
-        if (!SDL_Init(SDL_INIT_VIDEO)) {
-            println("Error: SDL_Init(): {}", SDL_GetError());
+        framebufferCount_ = config.framebufferCount < 2 ? 2 : config.framebufferCount;
+
+        glfwSetErrorCallback(&GlfwErrorCallback);
+        if (glfwInit() == GLFW_FALSE) {
+            println("Error: glfwInit() failed");
+            return nullptr;
+        }
+        glfwInitialized_ = true;
+
+        if (glfwVulkanSupported() == GLFW_FALSE) {
+            println("Error: glfwVulkanSupported() == GLFW_FALSE");
             return nullptr;
         }
 
         using enum window_flags;
-        auto sdlwnd_flags = static_cast<int>(SDL_WINDOW_VULKAN);
-        sdlwnd_flags |= (config.flags & fullscreen) ? SDL_WINDOW_FULLSCREEN : 0;
-        sdlwnd_flags |= (config.flags & resizable) ? SDL_WINDOW_RESIZABLE : 0;
-        sdlwnd_flags |= (config.flags & borderless) ? SDL_WINDOW_BORDERLESS : 0;
-        sdlwnd_flags |= (config.flags & maximized) ? SDL_WINDOW_MAXIMIZED : 0;
-        auto window_flags = static_cast<SDL_WindowFlags>(sdlwnd_flags);
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        glfwWindowHint(
+            GLFW_RESIZABLE,
+            (config.flags & resizable) ? GLFW_TRUE : GLFW_FALSE);
+        glfwWindowHint(
+            GLFW_DECORATED,
+            (config.flags & borderless) ? GLFW_FALSE : GLFW_TRUE);
+        glfwWindowHint(
+            GLFW_MAXIMIZED,
+            (config.flags & maximized) ? GLFW_TRUE : GLFW_FALSE);
 
-        sdlWindow_ = SDL_CreateWindow(
-            config.name.c_str(), config.width, config.height, window_flags);
-        if (sdlWindow_ == nullptr) {
-            println("Error: SDL_CreateWindow(): {}", SDL_GetError());
+        GLFWmonitor* monitor =
+            (config.flags & fullscreen) ? glfwGetPrimaryMonitor() : nullptr;
+        window_ = glfwCreateWindow(
+            config.width, config.height, config.name.c_str(), monitor, nullptr);
+        if (window_ == nullptr) {
+            println("Error: glfwCreateWindow() failed");
             return nullptr;
         }
 
-        auto scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
-
-        std::vector<const char*> extensions;
-        uint32_t sdl_extension_count = 0;
-        const char* const* sdl_extensions =
-            SDL_Vulkan_GetInstanceExtensions(&sdl_extension_count);
-        for (uint32_t i = 0; i < sdl_extension_count; ++i) {
-            extensions.emplace_back(sdl_extensions[i]); // NOLINT
-        }
-        SetupVulkan(vkContext_, config.name, extensions);
-
-        VkSurfaceKHR surface{};
-        VkResult result{};
-        if (!SDL_Vulkan_CreateSurface(
-                sdlWindow_, vkContext_.instance, nullptr, &surface)) {
-            println("Error: SDL_Vulkan_CreateSurface(): {}", SDL_GetError());
+        uint32_t extensionCount = 0;
+        const char** glfwExtensions =
+            glfwGetRequiredInstanceExtensions(&extensionCount);
+        if (glfwExtensions == nullptr || extensionCount == 0) {
+            println("Error: glfwGetRequiredInstanceExtensions() failed");
             return nullptr;
+        }
+
+        std::vector<const char*> extensions(
+            glfwExtensions, glfwExtensions + extensionCount);
+
+        if (!SetupVulkan(vkContext_, config.name, extensions)) {
+            return nullptr;
+        }
+
+        VkResult result = glfwCreateWindowSurface(
+            vkContext_.instance, window_, vkContext_.allocator, &surface_);
+        if (result != VK_SUCCESS) {
+            ImGuiCheckVkResult(result);
+            return nullptr;
+        }
+
+        int framebufferWidth{};
+        int framebufferHeight{};
+        glfwGetFramebufferSize(window_, &framebufferWidth, &framebufferHeight);
+        if (framebufferWidth <= 0 || framebufferHeight <= 0) {
+            framebufferWidth  = config.width;
+            framebufferHeight = config.height;
         }
 
         ImGui_ImplVulkanH_Window* imgui_vulkan_window = &imguiWindowData_;
-        SetupVulkanWindow(
-            imgui_vulkan_window, vkContext_, surface, config.width,
-            config.height, framebufferCount_);
-        SDL_ShowWindow(sdlWindow_);
+        if (!SetupVulkanWindow(
+                imgui_vulkan_window, vkContext_, surface_, framebufferWidth,
+                framebufferHeight, framebufferCount_)) {
+            return nullptr;
+        }
+        vulkanWindowInitialized_ = true;
 
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
+        imguiContextCreated_ = true;
         ImGuiIO& io = ImGui::GetIO();
         (void)io;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
         // dpi
 
         ImGui::StyleColorsDark();
 
-        ImGuiStyle& style = ImGui::GetStyle();
-        style.ScaleAllSizes(scale);
-        // dpi
+        if (!ImGui_ImplGlfw_InitForVulkan(window_, true)) {
+            println("Error: ImGui_ImplGlfw_InitForVulkan() failed");
+            return nullptr;
+        }
+        imguiGlfwInitialized_ = true;
 
-        ImGui_ImplSDL3_InitForVulkan(sdlWindow_);
         ImGui_ImplVulkan_InitInfo init_info{};
+        init_info.ApiVersion     = VK_API_VERSION_1_0;
         init_info.Instance       = vkContext_.instance;
         init_info.PhysicalDevice = vkContext_.physicalDevice;
         init_info.Device         = vkContext_.device;
+        init_info.QueueFamily    = vkContext_.queueFamilyIndex;
         init_info.Queue          = vkContext_.queue;
-        // init_info.PipelineCache   = g_pipeline_cache;
         init_info.PipelineCache   = nullptr;
         init_info.DescriptorPool  = vkContext_.descriptorPool;
-        init_info.RenderPass      = imgui_vulkan_window->RenderPass;
-        init_info.Subpass         = 0;
         init_info.MinImageCount   = framebufferCount_;
         init_info.ImageCount      = imgui_vulkan_window->ImageCount;
-        init_info.MSAASamples     = VK_SAMPLE_COUNT_4_BIT;
+        init_info.PipelineInfoMain.RenderPass   = imgui_vulkan_window->RenderPass;
+        init_info.PipelineInfoMain.Subpass      = 0;
+        init_info.PipelineInfoMain.MSAASamples  = VK_SAMPLE_COUNT_1_BIT;
         init_info.Allocator       = vkContext_.allocator;
         init_info.CheckVkResultFn = &ImGuiCheckVkResult;
-        ImGui_ImplVulkan_Init(&init_info);
+        if (!ImGui_ImplVulkan_Init(&init_info)) {
+            println("Error: ImGui_ImplVulkan_Init() failed");
+            return nullptr;
+        }
+        imguiVulkanInitialized_ = true;
 
         // load fonts
         //
@@ -125,32 +164,31 @@ public:
     }
 
     bool pollEvents() {
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            ImGui_ImplSDL3_ProcessEvent(&event);
-            if (event.type == SDL_EVENT_QUIT) [[unlikely]] {
-                stopped_ = true;
-            }
-            if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
-                event.window.windowID == SDL_GetWindowID(sdlWindow_)) {
-                stopped_ = true;
-            }
+        glfwPollEvents();
+
+        if (glfwWindowShouldClose(window_) != 0) [[unlikely]] {
+            stopped_ = true;
+            return false;
         }
 
-        if ((SDL_GetWindowFlags(sdlWindow_) & SDL_WINDOW_MINIMIZED) != 0) {
+        if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) != 0) {
+            ImGui_ImplGlfw_Sleep(10);
             return false;
         }
 
         int width{};
         int height{};
-        SDL_GetWindowSize(sdlWindow_, &width, &height);
-        if (width > 0 && height > 0 && (vkContext_.rebuildSwapchain)) {
+        glfwGetFramebufferSize(window_, &width, &height);
+        const bool framebufferResized =
+            imguiWindowData_.Width != width || imguiWindowData_.Height != height;
+        if (width > 0 && height > 0 &&
+            (vkContext_.rebuildSwapchain || framebufferResized)) {
             ImGui_ImplVulkan_SetMinImageCount(framebufferCount_);
             ImGui_ImplVulkanH_CreateOrResizeWindow(
                 vkContext_.instance, vkContext_.physicalDevice,
                 vkContext_.device, &imguiWindowData_,
                 vkContext_.queueFamilyIndex, vkContext_.allocator, width,
-                height, framebufferCount_);
+                height, framebufferCount_, 0);
             imguiWindowData_.FrameIndex = 0;
             vkContext_.rebuildSwapchain = false;
         }
@@ -163,7 +201,7 @@ public:
     // NOLINTNEXTLINE
     void renderBegin() {
         ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
     }
 
@@ -176,31 +214,52 @@ public:
         if (!minimized) {
             Render(&imguiWindowData_, vkContext_, draw_data);
         }
-        auto& io = ImGui::GetIO();
-        if ((io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) != 0) {
-            ImGui::UpdatePlatformWindows();
-            ImGui::RenderPlatformWindowsDefault();
-        }
         if (!minimized) {
             ::Present(&imguiWindowData_, vkContext_);
         }
     }
 
     void destroy() {
-        vkContext_.device.waitIdle();
-        ImGui_ImplVulkan_Shutdown();
-        ImGui_ImplSDL3_Shutdown();
-        ImGui::DestroyContext();
-        CleanupVulkanWindows(&imguiWindowData_, vkContext_);
+        if (vkContext_.device) {
+            vkContext_.device.waitIdle();
+        }
+        if (imguiVulkanInitialized_) {
+            ImGui_ImplVulkan_Shutdown();
+        }
+        if (imguiGlfwInitialized_) {
+            ImGui_ImplGlfw_Shutdown();
+        }
+        if (imguiContextCreated_) {
+            ImGui::DestroyContext();
+        }
+        if (vulkanWindowInitialized_) {
+            CleanupVulkanWindows(&imguiWindowData_, vkContext_);
+        }
+        if (surface_ != VK_NULL_HANDLE && vkContext_.instance) {
+            vkDestroySurfaceKHR(vkContext_.instance, surface_, vkContext_.allocator);
+            surface_ = VK_NULL_HANDLE;
+        }
         CleanupVulkan(vkContext_);
-        SDL_DestroyWindow(sdlWindow_);
-        SDL_Quit();
+        if (window_ != nullptr) {
+            glfwDestroyWindow(window_);
+            window_ = nullptr;
+        }
+        if (glfwInitialized_) {
+            glfwTerminate();
+            glfwInitialized_ = false;
+        }
     }
 
 private:
-    uint8_t framebufferCount_{};
-    bool stopped_          = false;
-    SDL_Window* sdlWindow_ = nullptr;
+    uint8_t framebufferCount_ = 2;
+    bool stopped_             = false;
+    bool glfwInitialized_     = false;
+    bool imguiContextCreated_ = false;
+    bool imguiGlfwInitialized_ = false;
+    bool imguiVulkanInitialized_ = false;
+    bool vulkanWindowInitialized_ = false;
+    GLFWwindow* window_       = nullptr;
+    VkSurfaceKHR surface_     = VK_NULL_HANDLE;
     ImGui_ImplVulkanH_Window imguiWindowData_;
     VulkanContext vkContext_;
 };
@@ -231,18 +290,44 @@ bool SetupVulkan(
     // create instance
     {
         auto extensionProperties  = vk::enumerateInstanceExtensionProperties();
-        const auto extensionCount = extensionProperties.size();
-        static std::vector<const char*> extensionNames(extensionCount, nullptr);
-        for (auto i = 0; i < extensionCount; ++i) {
-            extensionNames[i] = extensionProperties[i].extensionName;
+        if (IsExtensionAvailable(
+                extensionProperties,
+                VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME) &&
+            !IsExtensionEnabled(
+                instanceExtensions,
+                VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)) {
+            instanceExtensions.push_back(
+                VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
         }
+
+    #ifdef VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
+        bool enablePortabilityEnumeration = false;
+        if (IsExtensionAvailable(
+                extensionProperties,
+                VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) &&
+            !IsExtensionEnabled(
+                instanceExtensions,
+                VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME)) {
+            instanceExtensions.push_back(
+                VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+            enablePortabilityEnumeration = true;
+        }
+    #endif
 
         vk::ApplicationInfo appInfo{ appName.c_str(), 1, "atom", 1,
                                      VK_API_VERSION_1_0 };
 
         vk::InstanceCreateInfo instanceCreateInfo({}, &appInfo);
-        instanceCreateInfo.setEnabledExtensionCount(extensionProperties.size())
-            .setPpEnabledExtensionNames(extensionNames.data());
+        instanceCreateInfo
+            .setEnabledExtensionCount(instanceExtensions.size())
+            .setPpEnabledExtensionNames(instanceExtensions.data());
+
+    #ifdef VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
+        if (enablePortabilityEnumeration) {
+            instanceCreateInfo.flags |=
+                vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
+        }
+    #endif
 
         vkContext.instance = vk::createInstance(instanceCreateInfo);
     }
@@ -338,8 +423,8 @@ bool SetupVulkanWindow(
     IM_ASSERT(framebufferCount >= 2);
     ImGui_ImplVulkanH_CreateOrResizeWindow(
         vkContext.instance, vkContext.physicalDevice, vkContext.device,
-        imguiVkWnd, vkContext.queueFamilyIndex, {}, width, height,
-        framebufferCount);
+        imguiVkWnd, vkContext.queueFamilyIndex, vkContext.allocator, width,
+        height, framebufferCount, 0);
 
     return true;
 }
@@ -351,9 +436,53 @@ void CleanupVulkanWindows(
 }
 
 void CleanupVulkan(VulkanContext& vkContext) {
-    vkContext.device.destroyDescriptorPool(vkContext.descriptorPool);
-    vkContext.device.destroy();
-    vkContext.instance.destroy();
+    if (vkContext.device) {
+        if (vkContext.descriptorPool) {
+            vkContext.device.destroyDescriptorPool(vkContext.descriptorPool);
+            vkContext.descriptorPool = nullptr;
+        }
+        vkContext.device.destroy();
+        vkContext.device = nullptr;
+    }
+    if (vkContext.instance) {
+        vkContext.instance.destroy();
+        vkContext.instance = nullptr;
+    }
+}
+
+void GlfwErrorCallback(int error, const char* description) {
+    println(std::cerr, "GLFW Error {}: {}", error, description);
+}
+
+bool IsExtensionAvailable(
+    const std::vector<vk::ExtensionProperties>& properties,
+    const char* extension) {
+    for (const auto& property : properties) {
+        if (std::strcmp(property.extensionName, extension) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool IsExtensionAvailable(
+    const ImVector<VkExtensionProperties>& properties, const char* extension) {
+    for (const auto& property : properties) {
+        if (std::strcmp(property.extensionName, extension) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool IsExtensionEnabled(
+    const std::vector<const char*>& enabledExtensions, const char* extension) {
+    for (const auto* enabledExtension : enabledExtensions) {
+        if (std::strcmp(enabledExtension, extension) == 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void ImGuiCheckVkResult(VkResult result) {
@@ -487,4 +616,5 @@ void Present(ImGui_ImplVulkanH_Window* imguiVkWnd, VulkanContext& vkContext) {
     imguiVkWnd->SemaphoreIndex =
         (imguiVkWnd->SemaphoreIndex + 1) % imguiVkWnd->SemaphoreCount;
 }
+
 #endif
