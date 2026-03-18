@@ -11,6 +11,8 @@
 
 namespace electron {
 
+inline constexpr auto enable_windows_events = neutron::enable_events;
+
 class App {
     class Impl;
     static Impl* _create_impl();
@@ -22,6 +24,20 @@ class App {
     static void _destroy_impl(Impl*);
 
 public:
+    struct insertion {
+        bool poll_events() const { return App::_poll_events(pimpl_); }
+        bool is_stopped() const { return App::_is_stopped(pimpl_); }
+        void render_begin() const { App::_render_begin(pimpl_); }
+        void render_end() const { App::_render_end(pimpl_); }
+
+    private:
+        friend class App;
+
+        explicit insertion(Impl* pimpl) noexcept : pimpl_(pimpl) {}
+
+        Impl* pimpl_;
+    };
+
     using config_type = std::tuple<wnd_config>;
 
     static App Create() { return {}; }
@@ -73,18 +89,9 @@ public:
             *p_vk_context
         };
 
-        struct _app_hooks {
-            Impl* pimpl;
-
-            bool poll_events() const { return App::_poll_events(pimpl); }
-            bool is_stopped() const { return App::_is_stopped(pimpl); }
-            void render_begin() const { App::_render_begin(pimpl); }
-            void render_end() const { App::_render_end(pimpl); }
-        };
-
-        auto schedule = make_world_schedule(
-            _app_hooks{ pimpl.get() }, sch, cmdbufs, worlds);
-        schedule.run();
+        auto runtime =
+            make_runtime(insertion{ pimpl.get() }, sch, cmdbufs, worlds);
+        runtime.run();
     }
 };
 
