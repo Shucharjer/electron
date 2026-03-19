@@ -10,17 +10,15 @@ using namespace neutron;
 using namespace electron;
 using enum stage;
 
-void observe_app(neutron::insertion<const App::insertion&> app) {
+void observeApp(neutron::insertion<const App::insertion&> app) {
     [[maybe_unused]] auto& [insertion] = app;
 }
 
 int main() {
     constexpr auto world = world_desc | enable_render |
                            add_systems<render, &renderHello> |
-                           add_systems<pre_update, &observe_app> |
+                           add_systems<pre_update, &observeApp> |
                            add_systems<pre_update, &printFps>;
-    using desc_t      = std::remove_cvref_t<decltype(world)>;
-    using resources   = typename descriptor_traits<desc_t>::resources;
     const auto config = wnd_config{ .name   = "example",
                                     .width  = 1280,
                                     .height = 960,
