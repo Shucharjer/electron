@@ -10,10 +10,9 @@ using ticks_t  = uint32_t;
 constexpr auto b = std::default_initializable<
     std::chrono::time_point<std::chrono::system_clock>>;
 
-void printFps(
-    neutron::local<
-        std::chrono::time_point<std::chrono::system_clock>, duration, ticks_t>
-        local) {
+using time_point_t = decltype(std::chrono::high_resolution_clock::now());
+
+void printFps(neutron::local<time_point_t, duration, ticks_t> local) {
     using namespace std::chrono;
     auto [tp, dur, ticks] = local;
 
