@@ -43,7 +43,6 @@ add_subdirectory(${ELECTRON_THIRD_PARTY_SOURCE_DIR}/vulkan-headers)
 add_subdirectory(${ELECTRON_THIRD_PARTY_SOURCE_DIR}/VulkanMemoryAllocator)
 
 find_package(Vulkan REQUIRED)
-find_package(VulkanHeaders CONFIG REQUIRED)
 target_link_libraries(electron PUBLIC
   imgui::imgui
   glfw
